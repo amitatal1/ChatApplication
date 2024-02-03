@@ -8,6 +8,8 @@ using std::string;
 
 
 
+
+
 // recieves the type code of the message from socket (3 bytes)
 // and returns the code. if no message found in the socket returns 0 (which means the client disconnected)
 int Helper::getMessageTypeCode(const SOCKET sc)
@@ -21,7 +23,28 @@ int Helper::getMessageTypeCode(const SOCKET sc)
 	return  res;
 }
 
-
+ bool Helper::sendMessage(const SOCKET socket, const std::string& message)
+{
+	int msgBytes = message.size();
+	const char* cMessage = message.c_str();
+	int bytesSent = 0;
+	while (bytesSent < msgBytes)
+	{
+		int res = send(
+			socket,
+			cMessage + bytesSent,
+			msgBytes - bytesSent,
+			0
+		);
+		if (res == SOCKET_ERROR)
+		{
+			printf("Send Error");
+			return false;
+		}
+		bytesSent += res;
+	}
+	return true;
+}
 void Helper::send_update_message_to_client(const SOCKET sc, const string& file_content, const string& second_username, const string &all_users)
 {
 	//TRACE("all users: %s\n", all_users.c_str())
@@ -69,8 +92,7 @@ std::string Helper::getPartFromSocket(const SOCKET sc, const int bytesNum)
 void Helper::sendData(const SOCKET sc, const std::string message)
 {
 	const char* data = message.c_str();
-
-	if (send(sc, data, message.size(), 0) == INVALID_SOCKET)
+	if (sendMessage(sc, data) == false)
 	{
 		throw std::exception("Error while sending message to client");
 	}

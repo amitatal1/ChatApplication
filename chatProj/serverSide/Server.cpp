@@ -3,6 +3,10 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include "Helper.h"
+
+
+using std::string;
 
 Server::Server()
 {
@@ -49,7 +53,13 @@ void Server::serve(int port)
 	{
 		// the main thread is only accepting clients 
 		// and add then to the list of handlers
-		acceptClient();
+		try
+		{ 
+			acceptClient();
+		}
+		catch (...)
+		{
+		}
 	}
 }
 
@@ -64,35 +74,51 @@ void Server::acceptClient()
 		throw std::exception(__FUNCTION__);
 	
 	std::cout << "Client accepted." << std::endl;
+
 	// the function that handle the conversation with the client
-	_clientsTh.push_back(std::thread(&Server::clientHandler,this, std::ref(client_socket)));
+	std::thread clientTh(&Server::clientHandler,this, std::ref(client_socket));
+	clientTh.detach();
 }
 
 
-void Server::clientHandler(SOCKET clientSocket)
+void Server::clientHandler(const SOCKET clientSocket)
 {
 	printf("client met");
 	try
 	{
-		std::string s = "Welcome! What is your name (4 bytes)? ";
-		send(clientSocket, s.c_str(), s.size(), 0);  // last parameter: flag. for us will be 0.
+			
 
-		char m[5];
-		recv(clientSocket, m, 4, 0);
-		m[4] = 0;
-		std::cout << "Client name is: " << m << std::endl;
-
-		s = "Bye";
-		send(clientSocket, s.c_str(), s.size(), 0);
-		
-		// Closing the socket (in the level of the TCP protocol)
-		closesocket(clientSocket); 
 	}
 	catch (const std::exception& e)
 	{
 		closesocket(clientSocket);
 	}
 
+
+}
+
+string Server::loginUser(const SOCKET clientSocket)
+{
+	Helper::getMessageTypeCode(clientSocket);
+	
+	int nameLen = Helper::getIntPartFromSocket(clientSocket, 2); 
+	string name = Helper::getStringPartFromSocket(clientSocket,nameLen);// retrieving name from socket
+	
+	_users[name] = clientSocket; // inserts user connection to the list of users;
+
+	string namesList = "";
+	for (auto& user : _users)
+	{
+		namesList += user.first;
+		namesList += "&";
+	}
+	Helper::send_update_message_to_client(
+		clientSocket,
+		"",
+		"",
+		namesList
+	);
+	
 
 }
 

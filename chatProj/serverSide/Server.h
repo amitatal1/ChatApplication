@@ -5,8 +5,9 @@
 #include <vector>
 #include <thread>
 #include <map>
+#include "Message.h"
+#include <queue>
 
-using std::string;
 
 
 class Server
@@ -19,9 +20,10 @@ private:
 
 	void acceptClient();
 	void clientHandler(SOCKET clientSocket);
-	   
+	string loginUser(SOCKET clientSocket);
+
 	SOCKET _serverSocket;
-	std::vector<std::thread> _clientsTh;
+	std::queue<Message> _msgQueue;
 	std::map<string, SOCKET>  _users;
 };
 
