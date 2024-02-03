@@ -43,12 +43,12 @@ void Server::serve(int port)
 	if (listen(_serverSocket, SOMAXCONN) == SOCKET_ERROR)
 		throw std::exception(__FUNCTION__ " - listen");
 	std::cout << "Listening on port " << port << std::endl;
+	std::cout << "Waiting for client connection request" << std::endl;
 
 	while (true)
 	{
 		// the main thread is only accepting clients 
 		// and add then to the list of handlers
-		std::cout << "Waiting for client connection request" << std::endl;
 		acceptClient();
 	}
 }
@@ -62,15 +62,16 @@ void Server::acceptClient()
 	SOCKET client_socket = accept(_serverSocket, NULL, NULL);
 	if (client_socket == INVALID_SOCKET)
 		throw std::exception(__FUNCTION__);
-
-	std::cout << "Client accepted. Server and client can speak" << std::endl;
+	
+	std::cout << "Client accepted." << std::endl;
 	// the function that handle the conversation with the client
-	clientHandler(client_socket);
+	_clientsTh.push_back(std::thread(&Server::clientHandler,this, std::ref(client_socket)));
 }
 
 
 void Server::clientHandler(SOCKET clientSocket)
 {
+	printf("client met");
 	try
 	{
 		std::string s = "Welcome! What is your name (4 bytes)? ";

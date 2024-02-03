@@ -5,6 +5,8 @@
 #include <iostream>
 #include <exception>
 
+#define PORT 8826
+
 int main()
 {
 	try
@@ -12,7 +14,7 @@ int main()
 		WSAInitializer wsaInit;
 		Server myServer;
 
-		myServer.serve(8876);
+		myServer.serve(PORT);
 	}
 	catch (std::exception& e)
 	{
