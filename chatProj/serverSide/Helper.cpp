@@ -14,7 +14,13 @@ using std::string;
 // and returns the code. if no message found in the socket returns 0 (which means the client disconnected)
 int Helper::getMessageTypeCode(const SOCKET sc)
 {
+		
+		
 	std::string msg = getPartFromSocket(sc, 3, 0);
+		
+
+
+	
 
 	if (msg == "")
 		return 0;

@@ -74,9 +74,9 @@ void Server::acceptClient()
 		throw std::exception(__FUNCTION__);
 	
 	std::cout << "Client accepted." << std::endl;
-
+	
 	// the function that handle the conversation with the client
-	std::thread clientTh(&Server::clientHandler,this, std::ref(client_socket));
+	std::thread clientTh(&Server::clientHandler,this, client_socket);
 	clientTh.detach();
 }
 
@@ -86,11 +86,14 @@ void Server::clientHandler(const SOCKET clientSocket)
 	printf("client met");
 	try
 	{
-			
+		int code=Helper::getMessageTypeCode(clientSocket);
+
+		string userName = loginUser(clientSocket);
 
 	}
 	catch (const std::exception& e)
 	{
+		std::cout << e.what();
 		closesocket(clientSocket);
 	}
 
@@ -99,11 +102,9 @@ void Server::clientHandler(const SOCKET clientSocket)
 
 string Server::loginUser(const SOCKET clientSocket)
 {
-	Helper::getMessageTypeCode(clientSocket);
-	
 	int nameLen = Helper::getIntPartFromSocket(clientSocket, 2); 
 	string name = Helper::getStringPartFromSocket(clientSocket,nameLen);// retrieving name from socket
-	
+
 	_users[name] = clientSocket; // inserts user connection to the list of users;
 
 	string namesList = "";
@@ -112,6 +113,10 @@ string Server::loginUser(const SOCKET clientSocket)
 		namesList += user.first;
 		namesList += "&";
 	}
+	namesList.erase(namesList.size() - 1); // remove "&"
+
+
+	std::cout<<name <<"\n";
 	Helper::send_update_message_to_client(
 		clientSocket,
 		"",
@@ -119,6 +124,6 @@ string Server::loginUser(const SOCKET clientSocket)
 		namesList
 	);
 	
-
+	return name;
 }
 
