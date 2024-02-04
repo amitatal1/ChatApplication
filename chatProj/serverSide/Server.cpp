@@ -5,125 +5,212 @@
 #include <thread>
 #include "Helper.h"
 
-
 using std::string;
 
+#define CREATE_MESSAGE(author, data) ("&MAGSH_MESSAGE&&Author&" + std::string("<") + author + std::string(">&DATA&") + data)
+
+
+#define ClientUpdateMessage 204
+#define NAME_BYTES_NUM 2
+#define CONTENT_BYTES_NUM 5
+
+// Constructor
 Server::Server()
 {
+    // Creating a TCP socket
+    _serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	// this server use TCP. that why SOCK_STREAM & IPPROTO_TCP
-	// if the server use UDP we will use: SOCK_DGRAM & IPPROTO_UDP
-	_serverSocket = socket(AF_INET,  SOCK_STREAM,  IPPROTO_TCP); 
-
-	if (_serverSocket == INVALID_SOCKET)
-		throw std::exception(__FUNCTION__ " - socket");
+    if (_serverSocket == INVALID_SOCKET)
+        throw std::exception(__FUNCTION__ " - socket");
 }
 
+// Destructor
 Server::~Server()
 {
-	try
-	{
-		// the only use of the destructor should be for freeing 
-		// resources that was allocated in the constructor
-		closesocket(_serverSocket);
-	}
-	catch (...) {}
+    try
+    {
+        // Closing the server socket in the destructor
+        closesocket(_serverSocket);
+    }
+    catch (...) {}
 }
 
+// Method to start the server and listen for incoming connections
 void Server::serve(int port)
 {
-	
-	struct sockaddr_in sa = { 0 };
-	
-	sa.sin_port = htons(port); // port that server will listen for
-	sa.sin_family = AF_INET;   // must be AF_INET
-	sa.sin_addr.s_addr = INADDR_ANY;    // when there are few ip's for the machine. We will use always "INADDR_ANY"
+    struct sockaddr_in sa = { 0 };
 
-	// Connects between the socket and the configuration (port and etc..)
-	if (bind(_serverSocket, (struct sockaddr*)&sa, sizeof(sa)) == SOCKET_ERROR)
-		throw std::exception(__FUNCTION__ " - bind");
-	
-	// Start listening for incoming requests of clients
-	if (listen(_serverSocket, SOMAXCONN) == SOCKET_ERROR)
-		throw std::exception(__FUNCTION__ " - listen");
-	std::cout << "Listening on port " << port << std::endl;
-	std::cout << "Waiting for client connection request" << std::endl;
+    sa.sin_port = htons(port); // Port that server will listen for
+    sa.sin_family = AF_INET;   // Must be AF_INET
+    sa.sin_addr.s_addr = INADDR_ANY; // Listen on any available network interface
 
-	while (true)
-	{
-		// the main thread is only accepting clients 
-		// and add then to the list of handlers
-		try
-		{ 
-			acceptClient();
-		}
-		catch (...)
-		{
-		}
-	}
+    // Binding the socket to the specified configuration (port and address)
+    if (bind(_serverSocket, (struct sockaddr*)&sa, sizeof(sa)) == SOCKET_ERROR)
+        throw std::exception(__FUNCTION__ " - bind");
+
+    // Start listening for incoming client connections
+    if (listen(_serverSocket, SOMAXCONN) == SOCKET_ERROR)
+        throw std::exception(__FUNCTION__ " - listen");
+
+    std::cout << "Listening on port " << port << std::endl;
+    std::cout << "Waiting for client connection request" << std::endl;
+
+    while (true)
+    {
+        // Accepting new clients in the main loop and handling them in a separate thread
+        try
+        {
+            acceptClient();
+        }
+        catch (...)
+        {
+      
+        }
+    }
 }
 
-
+// Method to accept a client connection
 void Server::acceptClient()
 {
+    // Accepting a client and creating a specific socket from the server to the client
+    SOCKET client_socket = accept(_serverSocket, NULL, NULL);
+    if (client_socket == INVALID_SOCKET)
+        throw std::exception(__FUNCTION__);
 
-	// this accepts the client and create a specific socket from server to this client
-	// the process will not continue until a client connects to the server
-	SOCKET client_socket = accept(_serverSocket, NULL, NULL);
-	if (client_socket == INVALID_SOCKET)
-		throw std::exception(__FUNCTION__);
-	
-	std::cout << "Client accepted." << std::endl;
-	
-	// the function that handle the conversation with the client
-	std::thread clientTh(&Server::clientHandler,this, client_socket);
-	clientTh.detach();
+    std::cout << "Client accepted." << std::endl;
+
+    // Handling the client in a separate thread
+    std::thread clientTh(&Server::clientHandler, this, client_socket);
+    clientTh.detach();
 }
 
-
+// Method to handle communication with a specific client
 void Server::clientHandler(const SOCKET clientSocket)
 {
-	printf("client met");
-	try
-	{
-		int code=Helper::getMessageTypeCode(clientSocket);
+    printf("Client has been met\n");
+    try
+    {
+        int code = Helper::getMessageTypeCode(clientSocket);
 
-		string userName = loginUser(clientSocket);
+        // Logging in the user and handling messages
+        string userName = loginUser(clientSocket);
+        while (true)
+        {
+            code = Helper::getMessageTypeCode(clientSocket);
+            switch (code)
+            {
+                case ClientUpdateMessage:
+                parseNewMsgReq(clientSocket, userName);
+                    break;
 
-	}
-	catch (const std::exception& e)
-	{
-		std::cout << e.what();
-		closesocket(clientSocket);
-	}
-
-
+                default:
+                    break;
+            }
+        }
+    }
+    catch (const std::exception& e)
+    {
+        std::cout << e.what();
+        closesocket(clientSocket);
+    }
 }
 
+
+
+// Method to log in a user and send updates to other clients
 string Server::loginUser(const SOCKET clientSocket)
 {
-	int nameLen = Helper::getIntPartFromSocket(clientSocket, 2); 
-	string name = Helper::getStringPartFromSocket(clientSocket,nameLen);// retrieving name from socket
+    int nameLen = Helper::getIntPartFromSocket(clientSocket, 2);
+    string name = Helper::getStringPartFromSocket(clientSocket, nameLen); // Retrieving name from socket
 
-	_users[name] = clientSocket; // inserts user connection to the list of users;
+    std::unique_lock<std::mutex> userMapLock(_usersMx);
+    _users[name] = clientSocket; // Inserting user connection into the list of users;
 
-	string namesList = "";
-	for (auto& user : _users)
-	{
-		namesList += user.first;
-		namesList += "&";
-	}
-	namesList.erase(namesList.size() - 1); // remove "&"
+    userMapLock.unlock();
+    string namesList = connectedUserList();
 
 
-	std::cout<<name <<"\n";
-	Helper::send_update_message_to_client(
-		clientSocket,
-		"",
-		"",
-		namesList
-	);
-	
-	return name;
+
+    std::cout << name << "\n";
+    Helper::send_update_message_to_client(
+        clientSocket,
+        "",
+        "",
+        namesList
+    );
+
+    return name;
 }
 
+// Method to parse a new message request and add it to the message queue
+void Server::parseNewMsgReq(const SOCKET clientSocket, const string& userName)
+{
+    try
+    {
+        Message msg =
+        {
+            userName, // Sender name
+            Helper::getStringPartFromSocket(clientSocket, Helper::getIntPartFromSocket(clientSocket, NAME_BYTES_NUM)), // Address
+            Helper::getStringPartFromSocket(clientSocket, Helper::getIntPartFromSocket(clientSocket, CONTENT_BYTES_NUM)) // Content
+        };
+
+        string fileContent = "";
+
+        //update request 
+        if (msg.sender != "")
+        {
+            const string fileName = Helper::getFileName(userName, msg.sender);
+            fileContent = Helper::readFileToString(fileName);
+        }
+
+      
+
+
+        Helper::send_update_message_to_client
+        (
+            clientSocket, 
+            fileContent,
+            msg.address,
+            connectedUserList()
+        );
+    
+        // new message 
+        if (msg.content != "")
+        {
+            std::unique_lock<std::mutex> msgLock(_msgsMx);
+
+                _msgQueue.push(msg);
+
+            msgLock.unlock();
+
+            _msgcond.notify_one(); // notfiy messages' handling 
+        }
+        
+    }
+    catch (const std::exception&)
+    {
+        return;
+    }
+}
+
+string Server::connectedUserList()  // writing const is prevented by the mutex 
+{
+    std::unique_lock<std::mutex> userMapLock(_usersMx);
+
+    string namesList = "";
+    for (auto& user : _users)
+    {
+        namesList += user.first;
+        namesList += "&";
+    }
+    userMapLock.unlock();
+
+    namesList.erase(namesList.size() - 1); // Remove the trailing "&"
+
+    return namesList;
+}
+
+void Server::messagesHandling()
+{
+    
+}

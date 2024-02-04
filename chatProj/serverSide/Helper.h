@@ -14,6 +14,7 @@ enum MessageType : byte
 	MT_SERVER_UPDATE = 101,
 };
 
+using std::string;
 
 class Helper
 {
@@ -27,10 +28,12 @@ public:
 	static void sendData(const SOCKET sc, const std::string message);
 	static void send_update_message_to_client(const SOCKET sc, const std::string& file_content, const std::string& second_username, const std::string& all_users);
 	static std::string getPaddedNumber(const int num, const int digits);
-
+	static const string getFileName(const string& name1, const string& name2);
+	static  std::string readFileToString(const std::string& filename);
 private:
 	static std::string getPartFromSocket(const SOCKET sc, const int bytesNum);
 	static std::string getPartFromSocket(const SOCKET sc, const int bytesNum, const int flags);
+
 
 };
 

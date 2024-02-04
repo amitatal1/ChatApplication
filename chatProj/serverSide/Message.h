@@ -5,6 +5,6 @@ using std::string;
 struct Message
 {
 	string sender;
-	string content;
 	string address;
+	string content;
 };
