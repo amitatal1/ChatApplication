@@ -1,0 +1,4 @@
+&MAGSH_MESSAGE&&Author&homo&DATA&shalom
+
+&MAGSH_MESSAGE&&Author&lior&DATA&qwease
+&MAGSH_MESSAGE&&Author&homo&DATA&haha

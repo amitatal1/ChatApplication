@@ -26,7 +26,7 @@ private:
 
 	string connectedUserList() ;
 
-	void writeToFile(Message& msg)
+	void writeToFile(Message& msg);
 	void messagesHandling();
 
 	//properties

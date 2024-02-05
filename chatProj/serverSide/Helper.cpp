@@ -79,11 +79,11 @@ const string Helper::getFileName(const string& name1, const string& name2)
 {
     if (name1 > name2)
     {
-        return name1 + "&" + name2;
+        return name1 + "&" + name2+ ".txt";
     }
     else
     {
-        return name2 + "&" + name1;
+        return name2 + "&" + name1+ ".txt";
     }
 }
 

@@ -4,10 +4,11 @@
 #include <string>
 #include <thread>
 #include "Helper.h"
+#include <fstream>
 
 using std::string;
 
-#define CREATE_MESSAGE(author, data) ("&MAGSH_MESSAGE&&Author&" + std::string("<") + author + std::string(">&DATA&") + data)
+#define CREATE_MESSAGE(author, data) ("&MAGSH_MESSAGE&&Author&"  + author + std::string("&DATA&") + data+"\n")
 
 
 #define ClientUpdateMessage 204
@@ -55,6 +56,7 @@ void Server::serve(int port)
     std::cout << "Listening on port " << port << std::endl;
     std::cout << "Waiting for client connection request" << std::endl;
 
+    std::thread messagesHandle(&Server::messagesHandling, this);
     while (true)
     {
         // Accepting new clients in the main loop and handling them in a separate thread
@@ -92,26 +94,37 @@ void Server::clientHandler(const SOCKET clientSocket)
     {
         int code = Helper::getMessageTypeCode(clientSocket);
 
-        // Logging in the user and handling messages
-        string userName = loginUser(clientSocket);
-        while (true)
         {
-            code = Helper::getMessageTypeCode(clientSocket);
-            switch (code)
+            // Logging in the user and handling messages
+            string userName = loginUser(clientSocket);
+            try
             {
-                case ClientUpdateMessage:
-                parseNewMsgReq(clientSocket, userName);
-                    break;
 
-                default:
-                    break;
+                while (true)
+                {
+                    code = Helper::getMessageTypeCode(clientSocket);
+                    switch (code)
+                    {
+                    case ClientUpdateMessage:
+                        parseNewMsgReq(clientSocket, userName);
+                        break;
+
+                    default:
+                        break;
+                    }
+                }
+            }
+            catch (const std::exception& e)
+            {
+                std::cout << e.what();
+                _users.erase(userName);
+                closesocket(clientSocket);
             }
         }
     }
     catch (const std::exception& e)
     {
         std::cout << e.what();
-        closesocket(clientSocket);
     }
 }
 
@@ -159,7 +172,7 @@ void Server::parseNewMsgReq(const SOCKET clientSocket, const string& userName)
         //update request 
         if (msg.sender != "")
         {
-            const string fileName = Helper::getFileName(userName, msg.sender);
+            const string fileName = Helper::getFileName(userName, msg.address);
             fileContent = Helper::readFileToString(fileName);
         }
 
@@ -210,7 +223,33 @@ string Server::connectedUserList()  // writing const is prevented by the mutex
     return namesList;
 }
 
+void Server::writeToFile(Message& msg)
+{
+    //openning file 
+    string fileName = Helper::getFileName(msg.address,msg.sender);
+    std::ofstream chatFile(fileName, std::ios::app);
+
+    string printintMsg = CREATE_MESSAGE(msg.sender, msg.content);
+
+    // wrtie to file
+    chatFile << printintMsg;
+
+    
+}
+
 void Server::messagesHandling()
 {
-    
+    while (true)
+    {
+        std::unique_lock<std::mutex> queueLock(_msgsMx);
+        _msgcond.wait(queueLock, [this]() { return !_msgQueue.empty(); }); // wait untill new msg is entered 
+        
+        writeToFile(_msgQueue.back());
+
+        _msgQueue.pop(); // remove message;
+
+        queueLock.unlock();
+    }
+
+
 }
